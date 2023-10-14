@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/context"
+	"github.com/gorilla/sessions"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -15,15 +17,41 @@ type Calculation struct {
 
 var calculations []Calculation
 
+var store = sessions.NewCookieStore([]byte("pass"))
+
 func main() {
-	http.HandleFunc("/", handler)
-	err := http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/", createHandler)
+	err := http.ListenAndServe(":8080", context.ClearHandler(http.DefaultServeMux))
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func createHandler(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, "session-name")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	session.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400,
+		HttpOnly: true,
+	}
+	r.ParseForm()
+	name := r.FormValue("name")
+	if name != "" {
+		session.Values["name"] = name
+	}
+	fmt.Println("session:", session)
+	err = session.Save(r, w)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	calculator(w, r)
+}
+
+func calculator(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("index.html")
 	if err != nil {
 		fmt.Println(err)
@@ -88,7 +116,7 @@ func eval(expression string) (float64, error) {
 	for _, op := range operations {
 		if strings.Contains(expression, op) {
 			parts := strings.Split(expression, op)
-			if len(parts) < 2 {
+			if len(parts) != 2 {
 				return 0, fmt.Errorf("Invalid expression")
 			}
 
