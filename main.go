@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/context"
-	"github.com/gorilla/sessions"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -13,45 +11,20 @@ import (
 type Calculation struct {
 	Expression string
 	Result     float64
+	Session    string
 }
 
 var calculations []Calculation
 
-var store = sessions.NewCookieStore([]byte("pass"))
-
 func main() {
 	http.HandleFunc("/", createHandler)
-	err := http.ListenAndServe(":8080", context.ClearHandler(http.DefaultServeMux))
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request) {
-	session, err := store.Get(r, "session-name")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	session.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400,
-		HttpOnly: true,
-	}
-	r.ParseForm()
-	name := r.FormValue("name")
-	if name != "" {
-		session.Values["name"] = name
-	}
-	fmt.Println("session:", session)
-	err = session.Save(r, w)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-	calculator(w, r)
-}
-
-func calculator(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles("index.html")
 	if err != nil {
 		fmt.Println(err)
@@ -86,9 +59,8 @@ func calculator(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			fmt.Printf(err.Error())
 		}
-		fmt.Fprintf(w, "<h2>Calculation History</h2>")
 		for _, calc := range calculations {
-			fmt.Fprintf(w, "<p>%s = %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64))
+			fmt.Fprintf(w, "<p>%s = %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64)) // calc history output
 		}
 	}
 }
