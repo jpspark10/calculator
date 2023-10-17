@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/gorilla/sessions"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -15,55 +16,97 @@ type Calculation struct {
 }
 
 var calculations []Calculation
+var store = sessions.NewCookieStore([]byte("pass"))
+var templates *template.Template
 
 func main() {
-	http.HandleFunc("/", createHandler)
+	http.HandleFunc("/", calcHandler)
+	http.HandleFunc("/login", loginHandler)
+	templates = template.Must(template.ParseGlob("templates/*.html"))
+
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Printf(err.Error())
 	}
 }
 
-func createHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("index.html")
-	if err != nil {
-		fmt.Println(err)
-	}
+func calcHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		err := tmpl.Execute(w, calculations)
-		if err != nil {
-			fmt.Fprintf(w, err.Error())
-		}
+		templates.Execute(w, calculations)
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
+		session, _ := store.Get(r, "session")
+		untyped, ok := session.Values["username"]
+		if !ok {
+			return
+		}
+		username, ok := untyped.(string)
+		if !ok {
+			return
+		}
+		fmt.Fprintf(w, "<p>Username: %s<p>", username)
 
-		expression := r.FormValue("expression")
-
-		result, err := calculateExpression(expression)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		session.Values["expression"] = r.FormValue("expression")
+		untypedExpression, ok := session.Values["expression"]
+		if !ok {
+			return
+		}
+		expression, ok := untypedExpression.(string)
+		session.Values["result"], err = calculateExpression(expression)
+		untypedResult, ok := session.Values["result"]
+		if !ok {
+			return
+		}
+		result, ok := untypedResult.(float64)
+		if !ok {
+			http.Error(w, "Http status bad request", http.StatusBadRequest)
 			return
 		}
 
 		calculations = append(calculations, Calculation{
 			Expression: expression,
 			Result:     result,
+			Session:    username,
 		})
 
-		fmt.Fprintf(w, "<p>Result: %s<p>", strconv.FormatFloat(result, 'f', -1, 64))
-		err = tmpl.Execute(w, calculations)
-		if err != nil {
-			fmt.Printf(err.Error())
-		}
+		fmt.Fprintf(w, "<p>Result: %s<p>", strconv.FormatFloat(result, 'f', -1, 64)) // result output
+		templates.Execute(w, calculations)
 		for _, calc := range calculations {
-			fmt.Fprintf(w, "<p>%s = %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64)) // calc history output
+			if username == calc.Session {
+				fmt.Fprintf(w, "<p>%s = %s, user: %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // calc history output
+			}
 		}
 	}
 }
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		templates.ExecuteTemplate(w, "login.html", nil)
+	} else if r.Method == "POST" {
+		r.ParseForm()
+		username := r.PostForm.Get("username")
+		session, _ := store.Get(r, "session")
+		session.Values["username"] = username
+		session.Save(r, w)
+	}
+}
+
+/*func testGetHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+	untyped, ok := session.Values["username"]
+	if !ok {
+		return
+	}
+	username, ok := untyped.(string)
+	if !ok {
+		return
+	}
+	fmt.Fprintf(w, "%s", username)
+}*/
 
 func calculateExpression(expression string) (float64, error) {
 	expression = strings.ReplaceAll(expression, " ", "")
