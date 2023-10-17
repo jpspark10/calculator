@@ -20,7 +20,8 @@ var store = sessions.NewCookieStore([]byte("pass"))
 var templates *template.Template
 
 func main() {
-	http.HandleFunc("/", calcHandler)
+	http.HandleFunc("/", mainHandler)
+	http.HandleFunc("/calc", calcHandler)
 	http.HandleFunc("/login", loginHandler)
 	templates = template.Must(template.ParseGlob("templates/*.html"))
 
@@ -30,9 +31,32 @@ func main() {
 	}
 }
 
+func mainHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+	username := session.Values["username"]
+	if username == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	} else {
+		http.Redirect(w, r, "/calc", http.StatusSeeOther)
+	}
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		templates.ExecuteTemplate(w, "index.html", nil)
+	} else if r.Method == "POST" {
+		r.ParseForm()
+		username := r.PostForm.Get("username")
+		session, _ := store.Get(r, "session")
+		session.Values["username"] = username
+		session.Save(r, w)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+
 func calcHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		templates.Execute(w, calculations)
+		templates.ExecuteTemplate(w, "calc.html", nil)
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
@@ -82,31 +106,6 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
-
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		templates.ExecuteTemplate(w, "login.html", nil)
-	} else if r.Method == "POST" {
-		r.ParseForm()
-		username := r.PostForm.Get("username")
-		session, _ := store.Get(r, "session")
-		session.Values["username"] = username
-		session.Save(r, w)
-	}
-}
-
-/*func testGetHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "session")
-	untyped, ok := session.Values["username"]
-	if !ok {
-		return
-	}
-	username, ok := untyped.(string)
-	if !ok {
-		return
-	}
-	fmt.Fprintf(w, "%s", username)
-}*/
 
 func calculateExpression(expression string) (float64, error) {
 	expression = strings.ReplaceAll(expression, " ", "")
