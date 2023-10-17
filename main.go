@@ -56,7 +56,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 func calcHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		templates.ExecuteTemplate(w, "calc.html", nil)
+		templates.Execute(w, "calc.html")
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
@@ -81,13 +81,17 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		expression, ok := untypedExpression.(string)
 		session.Values["result"], err = calculateExpression(expression)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		untypedResult, ok := session.Values["result"]
 		if !ok {
 			return
 		}
 		result, ok := untypedResult.(float64)
 		if !ok {
-			http.Error(w, "Http status bad request", http.StatusBadRequest)
+			http.Error(w, "http status bad request", http.StatusBadRequest)
 			return
 		}
 
