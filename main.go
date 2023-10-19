@@ -1,6 +1,7 @@
 package main
 
 import (
+	"calculator-main/pkg/keygen"
 	"fmt"
 	"github.com/gorilla/sessions"
 	"html/template"
@@ -42,21 +43,16 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
-		templates.ExecuteTemplate(w, "index.html", nil)
-	} else if r.Method == "POST" {
-		r.ParseForm()
-		username := r.PostForm.Get("username")
-		session, _ := store.Get(r, "session")
-		session.Values["username"] = username
-		session.Save(r, w)
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-	}
+	session, _ := store.Get(r, "session")
+	session.Values["username"] = keygen.RandStr()
+	session.Save(r, w)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func calcHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		templates.Execute(w, "calc.html")
+		fmt.Fprintf(w, "Enter your math query")
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
@@ -72,7 +68,7 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		fmt.Fprintf(w, "<p>Username: %s<p>", username)
+		fmt.Fprintf(w, "<p>Your individual key: %s<p>", username)
 
 		session.Values["expression"] = r.FormValue("expression")
 		untypedExpression, ok := session.Values["expression"]
@@ -105,7 +101,7 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		templates.Execute(w, calculations)
 		for _, calc := range calculations {
 			if username == calc.Session {
-				fmt.Fprintf(w, "<p>%s = %s, user: %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // calc history output
+				fmt.Fprintf(w, "<p>%s = %s, key: %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // calc history output
 			}
 		}
 	}
@@ -135,7 +131,7 @@ func eval(expression string) (float64, error) {
 		if strings.Contains(expression, op) {
 			parts := strings.Split(expression, op)
 			if len(parts) != 2 {
-				return 0, fmt.Errorf("Invalid expression")
+				return 0, fmt.Errorf("Invalid expression1")
 			}
 
 			left, err := eval(parts[0])
@@ -152,7 +148,7 @@ func eval(expression string) (float64, error) {
 			case "+":
 				return left + right, nil
 			case "-":
-				return left - right, nil
+				return left + (-1 * right), nil
 			case "*":
 				return left * right, nil
 			case "/":
@@ -164,5 +160,5 @@ func eval(expression string) (float64, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("Invalid expression")
+	return 0, fmt.Errorf("Invalid expression2")
 }
