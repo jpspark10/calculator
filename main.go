@@ -52,7 +52,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 func calcHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		templates.Execute(w, "calc.html")
-		fmt.Fprintf(w, "Enter your math query")
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
@@ -68,8 +67,6 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		fmt.Fprintf(w, "<p>Your individual key: %s<p>", username)
-
 		session.Values["expression"] = r.FormValue("expression")
 		untypedExpression, ok := session.Values["expression"]
 		if !ok {
@@ -101,7 +98,8 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		templates.Execute(w, calculations)
 		for _, calc := range calculations {
 			if username == calc.Session {
-				fmt.Fprintf(w, "<p>%s = %s, key: %s</p>", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // calc history output
+				fmt.Fprintf(w, "<p>%s = %s", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64))                   // calc history output
+				fmt.Printf("%s = %s, key: %s\n", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // bebra
 			}
 		}
 	}
@@ -125,7 +123,7 @@ func eval(expression string) (float64, error) {
 		return result, nil
 	}
 
-	operations := []string{"+", "-", "*", "/"}
+	operations := []string{"+", "*", "/", "-"}
 
 	for _, op := range operations {
 		if strings.Contains(expression, op) {
