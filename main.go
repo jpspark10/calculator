@@ -2,12 +2,12 @@ package main
 
 import (
 	"calculator-main/pkg/keygen"
+	"calculator-main/pkg/mathparse"
 	"fmt"
 	"github.com/gorilla/sessions"
 	"html/template"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 type Calculation struct {
@@ -58,12 +58,17 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return
 		}
-		session, _ := store.Get(r, "session")
-		untyped, ok := session.Values["username"]
+		session, err := store.Get(r, "session")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		rpn := mathparse.RpnGo{}
+		untypedUsername, ok := session.Values["username"]
 		if !ok {
 			return
 		}
-		username, ok := untyped.(string)
+		username, ok := untypedUsername.(string)
 		if !ok {
 			return
 		}
@@ -72,24 +77,21 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
+		expr, _ := untypedExpression.(string)
 		expression, ok := untypedExpression.(string)
-		session.Values["result"], err = calculateExpression(expression)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		untypedResult, ok := session.Values["result"]
 		if !ok {
 			return
 		}
-		result, ok := untypedResult.(float64)
-		if !ok {
-			http.Error(w, "http status bad request", http.StatusBadRequest)
-			return
+		if expression[0] == '-' {
+			expression = "0-" + expression[1:]
 		}
+		rpn.CalculateExpression(expression)
+		result := rpn.GetResult()
+
+		session.Values["result"] = result
 
 		calculations = append(calculations, Calculation{
-			Expression: expression,
+			Expression: expr,
 			Result:     result,
 			Session:    username,
 		})
@@ -98,14 +100,14 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		templates.Execute(w, calculations)
 		for _, calc := range calculations {
 			if username == calc.Session {
-				fmt.Fprintf(w, "<p>%s = %s", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64))                   // calc history output
-				fmt.Printf("%s = %s, key: %s\n", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // bebra
+				fmt.Fprintf(w, "<p>%s = %s", calc.Expression, strconv.FormatFloat(calc.Result, 'f', -1, 64))              // calc history output
+				fmt.Printf("%s = %s, key: %s\n", expression, strconv.FormatFloat(calc.Result, 'f', -1, 64), calc.Session) // bebra
 			}
 		}
 	}
 }
 
-func calculateExpression(expression string) (float64, error) {
+/*func calculateExpression(expression string) (float64, error) {
 	expression = strings.ReplaceAll(expression, " ", "")
 	expression = strings.ReplaceAll(expression, ",", ".")
 
@@ -159,4 +161,4 @@ func eval(expression string) (float64, error) {
 	}
 
 	return 0, fmt.Errorf("Invalid expression2")
-}
+}*/
