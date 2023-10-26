@@ -82,6 +82,9 @@ func calcHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
+		if expression[0] == '-' {
+			expression = "0-" + expression[1:]
+		}
 		rpn.CalculateExpression(expression)
 		result := rpn.GetResult()
 
