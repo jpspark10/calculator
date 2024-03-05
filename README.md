@@ -1,3 +1,3 @@
 ## Dobri Calculator
 
-![dobri dracon](https://img.freepik.com/premium-vector/cute-cartoon-big-kind-dragon_156892-21.jpg)
+![dobri calc](https://i.ibb.co/1rrVn5Y/image.png)
